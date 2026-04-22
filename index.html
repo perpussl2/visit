@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="id">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Kunjungan Perpustakaan</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+
+    .glass { background: rgba(255,255,255,0.72); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,0.35); }
+    .card-shadow { box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04); }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes scaleIn { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }
+
+    .animate-fade-up { animation: fadeUp 0.5s ease-out forwards; }
+    .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+
+    .purpose-chip { transition: all 0.2s ease; }
+    .purpose-chip:hover { transform: translateY(-2px); }
+
+    .overlay { background: rgba(15,23,42,0.45); backdrop-filter: blur(6px); }
+    .toast-enter { animation: fadeUp 0.4s ease-out forwards; }
+
+    input:focus { outline: none; }
+    .cooldown-bar { transition: width 1s linear; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    
+    .tab-btn { cursor: pointer; }
+    .tab-btn.active { border-bottom-color: #2563eb; color: #2563eb; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
+ </head>
+ <body style="background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 40%, #ede9fe 100%);">
+  <div class="w-full h-full flex flex-col items-center justify-start px-4 py-8 md:py-12 overflow-auto">
+   <!-- Header -->
+   <header class="text-center mb-6 animate-fade-up w-full max-w-lg"><img src="logo.png" alt="Perpustakaan Digital" style="height:40px;width:auto;margin-bottom:1rem;" onerror="console.error('Logo failed to load:', this.src); this.style.display='none';">
+    <h1 id="page-title" class="text-3xl md:text-4xl font-800 text-slate-800 tracking-tight">Sistem Kunjungan Perpustakaan</h1>
+    <p id="subtitle" class="text-slate-500 mt-2 text-base md:text-lg font-light">Silakan masukkan nomor anggota Anda</p>
+   </header><!-- Global Stats Header -->
+   <div class="w-full max-w-lg mb-8 animate-fade-up">
+    <div class="grid grid-cols-2 gap-3">
+     <div class="glass rounded-2xl card-shadow px-4 py-5 text-center">
+      <p class="text-xs text-slate-400 font-medium uppercase tracking-wider mb-2">Total Kunjungan</p>
+      <p id="visitor-count-header" class="text-2xl font-700 text-blue-600">--</p>
+     </div>
+     <div class="glass rounded-2xl card-shadow px-4 py-5 text-center">
+      <p class="text-xs text-slate-400 font-medium uppercase tracking-wider mb-2">Waktu</p>
+      <p id="current-time-header" class="text-lg font-600 text-slate-800">--:--</p>
+     </div>
+    </div>
+   </div><!-- ALL CONTENT IN SINGLE SCROLLABLE SECTION -->
+   <div class="w-full max-w-lg animate-fade-up space-y-6"><!-- Main Card -->
+    <main class="glass rounded-3xl card-shadow p-6 md:p-8">
+     <!-- Input Section -->
+     <div class="mb-6">
+      <label class="block text-sm font-600 text-slate-700 mb-2">Nomor Anggota</label>
+      <div class="relative">
+       <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+        <i data-lucide="credit-card" style="width:20px;height:20px;"></i>
+       </div><input id="member-input" type="text" placeholder="Ketik nomor anggota..." class="w-full pl-12 pr-12 py-3.5 rounded-xl bg-white border-2 border-slate-200 text-slate-800 font-medium placeholder:text-slate-300 focus:border-blue-400 transition-colors text-base" autocomplete="off"> <button id="clear-btn" class="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors hidden" title="Hapus"> <i data-lucide="x" style="width:16px;height:16px;"></i> </button>
+      </div><!-- Loading -->
+      <div id="search-loading" class="hidden mt-3 flex items-center gap-2 text-sm text-slate-400">
+       <svg class="animate-spin w-4 h-4" viewbox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.3" /> <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+       </svg><span>Mencari data anggota...</span>
+      </div>
+     </div><!-- Member Detail -->
+     <div id="member-detail" class="hidden mb-6">
+      <div class="bg-gradient-to-br from-blue-50 to-blue-50 rounded-2xl p-5 border border-blue-100">
+       <div class="flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0">
+         <span id="member-avatar" class="text-white font-700 text-lg">A</span>
+        </div>
+        <div class="flex-1 min-w-0">
+         <p class="text-xs text-blue-500 font-600 uppercase tracking-wider mb-0.5">Data Anggota</p>
+         <h3 id="member-name" class="text-lg font-700 text-slate-800 truncate">-</h3>
+         <div class="flex flex-wrap gap-2 mt-2">
+          <span id="member-id-badge" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-xs font-600 text-slate-500 border border-slate-200"> <i data-lucide="hash" style="width:12px;height:12px;"></i> <span id="member-id-text">-</span> </span> <span id="member-category-badge" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-100 text-xs font-600 text-blue-700"> <i data-lucide="tag" style="width:12px;height:12px;"></i> <span id="member-category-text">-</span> </span>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div><!-- Not Found -->
+     <div id="member-not-found" class="hidden mb-6">
+      <div class="bg-red-50 rounded-2xl p-5 border border-red-200 text-center">
+       <div class="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center mx-auto mb-3">
+        <i data-lucide="user-x" style="width:24px;height:24px;color:#dc2626;"></i>
+       </div>
+       <p class="text-red-700 font-600 text-sm">Anggota tidak ditemukan</p>
+       <p class="text-red-400 text-xs mt-1">Periksa kembali nomor anggota Anda</p>
+      </div>
+     </div><!-- Cooldown Warning -->
+     <div id="cooldown-warning" class="hidden mb-6">
+      <div class="bg-amber-50 rounded-2xl p-5 border border-amber-200">
+       <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+         <i data-lucide="timer" style="width:20px;height:20px;color:#d97706;"></i>
+        </div>
+        <div class="flex-1">
+         <p class="text-amber-800 font-600 text-sm">Kunjungan sudah tercatat</p>
+         <p id="cooldown-text" class="text-amber-600 text-xs mt-0.5">Silakan kembali dalam 60 menit</p>
+        </div>
+       </div>
+       <div class="mt-3 h-1.5 bg-amber-100 rounded-full overflow-hidden">
+        <div id="cooldown-bar" class="cooldown-bar h-full bg-amber-400 rounded-full" style="width:100%;"></div>
+       </div>
+      </div>
+     </div><!-- Purpose Selection Button -->
+     <div id="purpose-section" class="hidden mb-6">
+      <label class="block text-sm font-600 text-slate-700 mb-2">Tujuan Kunjungan</label> <button id="purpose-trigger" class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-slate-200 hover:border-blue-300 transition-colors text-left">
+       <div class="flex items-center gap-3">
+        <i data-lucide="target" style="width:20px;height:20px;color:#64748b;"></i> <span id="purpose-label" class="text-slate-400 font-medium">Pilih tujuan kunjungan...</span>
+       </div><i data-lucide="chevron-right" style="width:18px;height:18px;color:#94a3b8;"></i> </button>
+     </div><!-- Custom Purpose Input -->
+     <div id="custom-purpose-section" class="hidden mb-6">
+      <label class="block text-sm font-600 text-slate-700 mb-2">Tujuan Kunjungan (Lainnya)</label>
+      <div class="relative">
+       <i data-lucide="edit-3" style="width:20px;height:20px;position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:#64748b;"></i> <input id="custom-purpose-input" type="text" placeholder="Ketik tujuan kunjungan Anda..." class="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white border-2 border-blue-300 text-slate-800 font-medium placeholder:text-slate-300 focus:border-blue-500 transition-colors text-base" maxlength="50">
+      </div>
+      <p class="text-xs text-slate-400 mt-2">Tekan Enter untuk konfirmasi atau klik tujuan lain</p>
+     </div><!-- Submit --> <button id="submit-btn" class="hidden w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-600 text-base transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled> <i data-lucide="check-circle" style="width:20px;height:20px;"></i> <span id="submit-text">Catat Kunjungan</span> </button>
+    </main><!-- STATISTIK SECTION -->
+    <div id="content-stats">
+     <div class="glass rounded-2xl card-shadow p-6">
+      <h3 class="text-lg font-700 text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="award" style="width:20px;height:20px;color:#f59e0b;"></i> Peringkat Anggota</h3>
+      <div id="ranking-list" class="space-y-3">
+       <p class="text-sm text-slate-400 text-center py-4">Memuat data peringkat...</p>
+      </div>
+     </div>
+    </div><!-- HISTORY SECTION -->
+    <div id="content-history">
+     <div class="glass rounded-2xl card-shadow p-6">
+      <h3 class="text-lg font-700 text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="history" style="width:20px;height:20px;color:#8b5cf6;"></i> Riwayat Kunjungan</h3>
+      <div id="history-list" class="space-y-3">
+       <p class="text-sm text-slate-400 text-center py-4">Memuat riwayat kunjungan...</p>
+      </div>
+     </div>
+    </div>
+   </div><!-- Footer -->
+   <footer class="mt-8 mb-4 text-center text-xs text-slate-400">
+    <p>© 2024 Perpustakaan Digital — Sistem Kunjungan</p>
+   </footer>
+  </div><!-- Purpose Modal -->
+  <div id="purpose-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 overlay">
+   <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-scale-in">
+    <div class="px-6 pt-6 pb-4 flex items-center justify-between border-b border-slate-100">
+     <h3 class="text-lg font-700 text-slate-800">Tujuan Kunjungan</h3><button id="close-modal-btn" class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"> <i data-lucide="x" style="width:18px;height:18px;color:#64748b;"></i> </button>
+    </div>
+    <div class="p-6 grid grid-cols-2 gap-3" id="purpose-grid"></div>
+   </div>
+  </div><!-- Toast -->
+  <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+  <script>
+    // ===== CONFIG =====
+    const purposes = [
+      { id:'baca', label:'Membaca', icon:'book-open', color:'bg-blue-100 text-blue-700 border-blue-200' },
+      { id:'pinjam', label:'Pinjam Buku', icon:'book-copy', color:'bg-violet-100 text-violet-700 border-violet-200' },
+      { id:'kembali', label:'Kembalikan Buku', icon:'undo-2', color:'bg-emerald-100 text-emerald-700 border-emerald-200' },
+      { id:'belajar', label:'Belajar', icon:'graduation-cap', color:'bg-amber-100 text-amber-700 border-amber-200' },
+      { id:'internet', label:'Akses Internet', icon:'wifi', color:'bg-cyan-100 text-cyan-700 border-cyan-200' },
+      { id:'lainnya', label:'Lainnya', icon:'more-horizontal', color:'bg-slate-100 text-slate-700 border-slate-200' },
+    ];
+
+    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+    let currentMember = null;
+    let selectedPurpose = null;
+    const apiUrl = 'https://script.google.com/macros/s/AKfycbwI0zv5H9bXjOtR8743hjq9_y6iTyGT9iBPXL6BGwn--yQGzPHjlQwpHU6KS6_RcTha3Q/exec';
+    let cooldowns = JSON.parse(localStorage.getItem('perpus_cooldowns') || '{}');
+    let allVisits = JSON.parse(localStorage.getItem('perpus_visits') || '[]');
+
+    // ===== ELEMENTS =====
+    const $ = id => document.getElementById(id);
+    const memberInput = $('member-input');
+    const clearBtn = $('clear-btn');
+    const searchLoading = $('search-loading');
+    const memberDetail = $('member-detail');
+    const memberNotFound = $('member-not-found');
+    const cooldownWarning = $('cooldown-warning');
+    const purposeSection = $('purpose-section');
+    const purposeTrigger = $('purpose-trigger');
+    const purposeLabel = $('purpose-label');
+    const purposeModal = $('purpose-modal');
+    const purposeGrid = $('purpose-grid');
+    const customPurposeSection = $('custom-purpose-section');
+    const customPurposeInput = $('custom-purpose-input');
+    const submitBtn = $('submit-btn');
+    const submitText = $('submit-text');
+
+    // Tabs - removed (single page view)
+
+    // ===== ELEMENT SDK INIT =====
+    const defaultConfig = {
+      page_title: 'Sistem Kunjungan Perpustakaan',
+      subtitle_text: 'Silakan masukkan nomor anggota Anda',
+      submit_button_text: 'Catat Kunjungan',
+      stats_label_today: 'Pengunjung Hari Ini',
+      stats_label_total: 'Total Pengunjung'
+    };
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => {
+          $('page-title').textContent = config.page_title || defaultConfig.page_title;
+          $('subtitle').textContent = config.subtitle_text || defaultConfig.subtitle_text;
+          $('submit-text').textContent = config.submit_button_text || defaultConfig.submit_button_text;
+          $('label-today').textContent = config.stats_label_today || defaultConfig.stats_label_today;
+        },
+        mapToCapabilities: (config) => ({
+          recolorables: [],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ['page_title', config.page_title || defaultConfig.page_title],
+          ['subtitle_text', config.subtitle_text || defaultConfig.subtitle_text],
+          ['submit_button_text', config.submit_button_text || defaultConfig.submit_button_text],
+          ['stats_label_today', config.stats_label_today || defaultConfig.stats_label_today],
+          ['stats_label_total', config.stats_label_total || defaultConfig.stats_label_total]
+        ])
+      });
+    }
+
+    // ===== PURPOSES GRID =====
+    purposes.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = `purpose-chip flex flex-col items-center gap-2 p-4 rounded-2xl border-2 ${p.color} hover:shadow-md`;
+      btn.dataset.purposeId = p.id;
+      btn.innerHTML = `<i data-lucide="${p.icon}" style="width:28px;height:28px;"></i><span class="text-sm font-600">${p.label}</span>`;
+      btn.addEventListener('click', () => {
+        if (p.id === 'lainnya') {
+          purposeGrid.parentElement.parentElement.classList.add('hidden');
+          customPurposeSection.classList.remove('hidden');
+          customPurposeInput.focus();
+        } else {
+          selectedPurpose = p;
+          purposeLabel.textContent = p.label;
+          purposeLabel.classList.remove('text-slate-400');
+          purposeLabel.classList.add('text-slate-800');
+          purposeTrigger.classList.add('border-blue-400');
+          customPurposeSection.classList.add('hidden');
+          customPurposeInput.value = '';
+          closePurposeModal();
+          updateSubmitState();
+        }
+      });
+      purposeGrid.appendChild(btn);
+    });
+
+    // ===== CUSTOM PURPOSE INPUT =====
+    customPurposeInput.addEventListener('input', () => {
+      const val = customPurposeInput.value.trim();
+      if (val) {
+        selectedPurpose = { id: 'custom', label: val, icon: 'more-horizontal' };
+        purposeLabel.textContent = val;
+        purposeLabel.classList.remove('text-slate-400');
+        purposeLabel.classList.add('text-slate-800');
+        purposeTrigger.classList.add('border-blue-400');
+        updateSubmitState();
+      }
+    });
+
+    customPurposeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const val = customPurposeInput.value.trim();
+        if (val) {
+          selectedPurpose = { id: 'custom', label: val };
+          purposeLabel.textContent = val;
+          purposeLabel.classList.remove('text-slate-400');
+          purposeLabel.classList.add('text-slate-800');
+          purposeTrigger.classList.add('border-blue-400');
+          customPurposeSection.classList.add('hidden');
+          purposeGrid.parentElement.parentElement.classList.remove('hidden');
+          closePurposeModal();
+          updateSubmitState();
+        }
+      }
+    });
+
+    // ===== TAB SWITCHING REMOVED - Data loads automatically =====
+
+    // ===== TIME =====
+    function updateTime() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+      $('current-time-header').textContent = timeStr;
+    }
+    updateTime();
+    setInterval(updateTime, 30000);
+
+    // ===== STATS & RANKING - Auto load on page init =====
+    async function loadStatsData() {
+      try {
+        const res = await fetch(`${apiUrl}?action=getHistory&limit=5000`);
+        const data = await res.json();
+        
+        if (!data.history || data.history.length === 0) {
+          $('visitor-count-header').textContent = '0';
+          $('ranking-list').innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Belum ada data kunjungan</p>';
+          return;
+        }
+        
+        // Total visits count
+        const totalVisits = data.history.length;
+        $('visitor-count-header').textContent = totalVisits;
+        
+        // Calculate and render ranking
+        calculateAndRenderRanking(data.history);
+      } catch(e) { 
+        console.error('Stats fetch error:', e); 
+        $('ranking-list').innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Gagal memuat data peringkat</p>';
+      }
+    }
+
+    function calculateAndRenderRanking(history) {
+      const list = $('ranking-list');
+      list.innerHTML = '';
+      
+      if (!history || history.length === 0) {
+        list.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Belum ada data peringkat</p>';
+        return;
+      }
+
+      // Group by member ID and count visits
+      const memberStats = {};
+      history.forEach(item => {
+        const memberId = item.id || 'Unknown';
+        if (!memberStats[memberId]) {
+          memberStats[memberId] = { id: memberId, nama: item.nama || 'Unknown', count: 0 };
+        }
+        memberStats[memberId].count += 1;
+      });
+
+      // Sort by visit count descending
+      const ranking = Object.values(memberStats).sort((a, b) => b.count - a.count);
+
+      const medals = ['🥇', '🥈', '🥉'];
+      ranking.slice(0, 10).forEach((item, idx) => {
+        const medal = medals[idx] || (idx + 1) + '.';
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors';
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="text-lg font-700 w-6 text-center">${medal}</span>
+            <div>
+              <p class="font-600 text-slate-800 text-sm">${item.nama}</p>
+              <p class="text-xs text-slate-400">#${item.id}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="font-700 text-blue-600 text-lg">${item.count}</p>
+            <p class="text-xs text-slate-400">kunjungan</p>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+      lucide.createIcons();
+    }
+
+    // ===== HISTORY - Auto load on page init =====
+    async function loadHistoryData() {
+      try {
+        const res = await fetch(`${apiUrl}?action=getHistory&limit=20`);
+        const data = await res.json();
+        renderHistory(data.history || []);
+      } catch(e) { 
+        console.error('History fetch error:', e); 
+        $('history-list').innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Gagal memuat riwayat</p>';
+      }
+    }
+
+    function renderHistory(history) {
+      const list = $('history-list');
+      list.innerHTML = '';
+
+      if (!history || history.length === 0) {
+        list.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Belum ada riwayat kunjungan</p>';
+        return;
+      }
+
+      history.forEach(item => {
+        const time = new Date(item.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const date = new Date(item.waktu).toLocaleDateString('id-ID');
+        const row = document.createElement('div');
+        row.className = 'p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors';
+        row.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="font-600 text-slate-800 text-sm truncate">${item.nama || 'Unknown'}</p>
+              <p class="text-xs text-slate-500 mt-1">${item.tujuan || 'Tidak ditentukan'}</p>
+              <p class="text-xs text-slate-400 mt-1">${date} • ${time}</p>
+            </div>
+            <span class="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-500">${item.kategori || '-'}</span>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    // Initialize - load all data on page load
+    updateTime();
+    setInterval(updateTime, 30000);
+    loadStatsData();
+    loadHistoryData();
+    
+    // Refresh data every 5 seconds
+    setInterval(() => {
+      loadStatsData();
+      loadHistoryData();
+    }, 5000);
+    function showToast(msg, type = 'success') {
+      const colors = { success:'bg-emerald-600', error:'bg-red-600', info:'bg-blue-600' };
+      const icons = { success:'check-circle', error:'alert-circle', info:'info' };
+      const div = document.createElement('div');
+      div.className = `toast-enter pointer-events-auto flex items-center gap-2 px-5 py-3 rounded-xl ${colors[type]} text-white text-sm font-600 shadow-lg`;
+      div.innerHTML = `<i data-lucide="${icons[type]}" style="width:18px;height:18px;"></i><span>${msg}</span>`;
+      $('toast-container').appendChild(div);
+      lucide.createIcons();
+      setTimeout(() => { div.style.opacity = '0'; div.style.transition = 'opacity 0.3s'; setTimeout(() => div.remove(), 300); }, 3500);
+    }
+
+    async function fetchMember(id) {
+      if (!apiUrl) { showToast('Atur URL Google Apps Script terlebih dahulu', 'error'); return null; }
+      try {
+        const res = await fetch(`${apiUrl}?action=getMember&id=${encodeURIComponent(id)}`);
+        const data = await res.json();
+        return data.found ? data : null;
+      } catch(e) { showToast('Gagal menghubungi server', 'error'); return null; }
+    }
+
+    async function submitVisit(memberId, name, category, purpose) {
+      if (!apiUrl) { showToast('Atur URL Google Apps Script terlebih dahulu', 'error'); return false; }
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action:'logVisit', id: memberId, nama: name, kategori: category, tujuan: purpose })
+        });
+        const data = await res.json();
+        return data.success;
+      } catch(e) { showToast('Gagal mencatat kunjungan', 'error'); return false; }
+    }
+
+    async function fetchVisitorCount() {
+      if (!apiUrl) return;
+      try {
+        const res = await fetch(`${apiUrl}?action=getCount`);
+        const data = await res.json();
+        $('visitor-count-header').textContent = data.count ?? '--';
+      } catch(e) { /* silent */ }
+    }
+
+    // ===== MEMBER INPUT =====
+    let searchTimeout;
+
+    // ===== COOLDOWN =====
+    function cleanCooldowns() {
+      const now = Date.now();
+      Object.keys(cooldowns).forEach(k => { if (now - cooldowns[k] > COOLDOWN_MS) delete cooldowns[k]; });
+      localStorage.setItem('perpus_cooldowns', JSON.stringify(cooldowns));
+    }
+    cleanCooldowns();
+
+    function isOnCooldown(memberId) {
+      cleanCooldowns();
+      return cooldowns[memberId] && (Date.now() - cooldowns[memberId] < COOLDOWN_MS);
+    }
+
+    function setCooldown(memberId) {
+      cooldowns[memberId] = Date.now();
+      localStorage.setItem('perpus_cooldowns', JSON.stringify(cooldowns));
+    }
+
+    function showCooldownState(memberId) {
+      const elapsed = Date.now() - cooldowns[memberId];
+      const remaining = COOLDOWN_MS - elapsed;
+      const mins = Math.ceil(remaining / 60000);
+      $('cooldown-text').textContent = `Silakan kembali dalam ${mins} menit`;
+      const pct = (remaining / COOLDOWN_MS) * 100;
+      $('cooldown-bar').style.width = `${pct}%`;
+      cooldownWarning.classList.remove('hidden');
+      purposeSection.classList.add('hidden');
+      submitBtn.classList.add('hidden');
+    }
+
+    memberInput.addEventListener('input', () => {
+      const val = memberInput.value.trim();
+      clearBtn.classList.toggle('hidden', !val);
+      memberDetail.classList.add('hidden');
+      memberNotFound.classList.add('hidden');
+      cooldownWarning.classList.add('hidden');
+      purposeSection.classList.add('hidden');
+      submitBtn.classList.add('hidden');
+      currentMember = null;
+      selectedPurpose = null;
+      purposeLabel.textContent = 'Pilih tujuan kunjungan...';
+      purposeLabel.className = 'text-slate-400 font-medium';
+      purposeTrigger.classList.remove('border-blue-400');
+      customPurposeInput.value = '';
+      customPurposeSection.classList.add('hidden');
+
+      clearTimeout(searchTimeout);
+      if (val.length >= 2) {
+        searchLoading.classList.remove('hidden');
+        searchTimeout = setTimeout(() => lookupMember(val), 600);
+      } else {
+        searchLoading.classList.add('hidden');
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      memberInput.value = '';
+      memberInput.dispatchEvent(new Event('input'));
+      memberInput.focus();
+    });
+
+    async function lookupMember(id) {
+      const data = await fetchMember(id);
+      searchLoading.classList.add('hidden');
+
+      if (!data) {
+        memberNotFound.classList.remove('hidden');
+        return;
+      }
+
+      currentMember = data;
+      $('member-avatar').textContent = (data.nama || '?')[0].toUpperCase();
+      $('member-name').textContent = data.nama;
+      $('member-id-text').textContent = data.id;
+      $('member-category-text').textContent = data.kategori;
+      memberDetail.classList.remove('hidden');
+
+      if (isOnCooldown(id)) {
+        showCooldownState(id);
+      } else {
+        purposeSection.classList.remove('hidden');
+        submitBtn.classList.remove('hidden');
+        submitBtn.style.display = 'flex';
+      }
+
+      lucide.createIcons();
+    }
+
+    // ===== PURPOSE MODAL =====
+    purposeTrigger.addEventListener('click', () => {
+      purposeModal.classList.remove('hidden');
+      purposeModal.classList.add('flex');
+    });
+    $('close-modal-btn').addEventListener('click', closePurposeModal);
+    purposeModal.addEventListener('click', (e) => { if (e.target === purposeModal) closePurposeModal(); });
+
+    function closePurposeModal() {
+      purposeModal.classList.add('hidden');
+      purposeModal.classList.remove('flex');
+    }
+
+    // ===== SUBMIT =====
+    function updateSubmitState() {
+      submitBtn.disabled = !(currentMember && selectedPurpose);
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      if (!currentMember || !selectedPurpose) return;
+
+      submitBtn.disabled = true;
+      submitText.textContent = 'Mencatat...';
+
+      const ok = await submitVisit(currentMember.id, currentMember.nama, currentMember.kategori, selectedPurpose.label);
+
+      if (ok) {
+        setCooldown(currentMember.id);
+        showToast('Kunjungan berhasil dicatat!', 'success');
+        fetchVisitorCount();
+        // Reset
+        memberInput.value = '';
+        memberInput.dispatchEvent(new Event('input'));
+      } else {
+        showToast('Gagal mencatat kunjungan', 'error');
+      }
+
+      submitText.textContent = window.elementSdk?.config?.submit_button_text || 'Catat Kunjungan';
+      submitBtn.disabled = false;
+    });
+
+    // ===== INIT ICONS =====
+    lucide.createIcons();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f030981a5c6008f',t:'MTc3Njg0NDIyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
